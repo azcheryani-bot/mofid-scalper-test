@@ -1,0 +1,60 @@
+name: Daily Sell Queue Scalper Sim
+
+on:
+  schedule:
+    # اجرای خودکار شنبه تا چهارشنبه ساعت 05:15 UTC (08:45 صبح ایران)
+    - cron: '15 5 * * 0,1,2,3,6'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'scalper_launcher.py'
+      - '.github/workflows/scalper_daily.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scalper-daily-runner
+  cancel-in-progress: false
+
+jobs:
+  run-scalper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Dependencies
+        run: pip install --upgrade pip requests urllib3
+
+      - name: Run Cloud Scalper Launcher (08:55 to 12:30 IRST)
+        env:
+          PYTHONUNBUFFERED: "1"
+          TZ: "Asia/Tehran"
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          MOFID_USERNAME: ${{ secrets.MOFID_USERNAME }}
+          MOFID_PASSWORD: ${{ secrets.MOFID_PASSWORD }}
+        run: |
+          python scalper_launcher.py
+
+      - name: Upload Logs & Trades as Artifacts (90 Days Retention)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scalper-results-${{ github.run_number }}
+          path: |
+            sell_queue_sim_log.txt
+            sell_queue_sim_trades.csv
+            sell_queue_sim_state.json
+          retention-days: 90
+          if-no-files-found: ignore
