@@ -3,12 +3,12 @@
 """
 لانچر ابری و ۱۰۰٪ امن شکارچی صف فروش برای GitHub Actions (scalper_launcher.py)
 
-ویژگی‌ها:
-۱) فاقد هرگونه اطلاعات محرمانه، پسورد یا توکن در داخل کد (۱۰۰٪ امن برای قراردادن در گیت‌هاب)
-۲) خواندن توکن‌های محیطی (GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN, GDRIVE_FOLDER_ID) از متغیرهای محیطی
-   مستقیماً از GitHub Actions Secrets
-۳) گوگل درایو github_scalper از پوشه «sell_queue_scalper_sim.py» دانلود خودکار آخرین ویرایش فایل
-   بدون نیاز به کامیت مجدد در گیت‌هاب برای تغییرات بعدی (RAM) و اجرا مستقیم آن در حافظه رم
+ویژگیها:
+۱) فاقد هرگونه اطلاعات محرمانه، پسورد یا توکن در داخل کد (۱۰۰٪ امن برای قراردادن در گیتهاب)
+۲) خواندن توکن‌های محیطی (GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN, GDRIVE_FOLDER_ID) مستقیماً
+از GitHub Actions Secrets
+۳) دانلود خودکار آخرین ویرایش فایل «sell_queue_scalper_sim.py» از پوشه github_scalper گوگل درایو
+و اجرا مستقیم آن در حافظه رم (RAM) بدون نیاز به کامیت مجدد در گیتهاب برای تغییرات بعدی
 """
 
 import json
@@ -27,7 +27,7 @@ def get_gdrive_access_token():
 
     if not (client_id and client_secret and refresh_token and folder_id):
         print(
-            "[!] در محیط اجرا تنظیم نشده‌اند (GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN, GDRIVE_FOLDER_ID) خطا: متغیرهای محیطی گوگل درایو"
+            "[!] متغیرهای محیطی گوگل درایو (GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN, GDRIVE_FOLDER_ID) در محیط اجرا تنظیم نشده‌اند"
         )
         return None, folder_id
 
@@ -58,13 +58,15 @@ def get_gdrive_access_token():
     return token, folder_id
 
 def download_target_from_drive(access_token, folder_id):
-    query = urllib.parse.quote(
-        f"name = '{TARGET_SCRIPT_NAME}' and '{folder_id}' in parents and trashed = false"
+    params = urllib.parse.urlencode(
+        {
+            "q": f"name = '{TARGET_SCRIPT_NAME}' and '{folder_id}' in parents and trashed = false",
+            "fields": "files(id,name,modifiedTime)",
+            "orderBy": "modifiedTime desc",
+            "pageSize": 1,
+        }
     )
-    url = (
-        "https://www.googleapis.com/drive/v3/files"
-        f"?q={query}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=1"
-    )
+    url = f"https://www.googleapis.com/drive/v3/files?{params}"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {access_token}"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -82,7 +84,7 @@ def download_target_from_drive(access_token, folder_id):
     req = urllib.request.Request(media_url, headers={"Authorization": f"Bearer {access_token}"})
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
-            return resp.read().decode("utf-8")
+            return resp.read().decode("utf-8", errors="replace")
     except Exception as e:
         print(f"[!] خطا در دانلود فایل از گوگل درایو: {e}")
         return None
@@ -103,7 +105,11 @@ def main():
     except Exception as e:
         print(f"[!] خطا در کامپایل اسکریپت دانلودشده: {e}")
         sys.exit(1)
-    globals_dict = {"__name__": "__main__", "__file__": TARGET_SCRIPT_NAME}
+    globals_dict = {
+        "__name__": "__main__",
+        "__file__": os.path.join(os.path.dirname(os.path.abspath(__file__)), TARGET_SCRIPT_NAME),
+        "__builtins__": __builtins__,
+    }
     try:
         exec(compiled, globals_dict)
     except SystemExit as e:
