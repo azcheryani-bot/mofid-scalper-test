@@ -1,9 +1,6 @@
 name: Daily Sell Queue Scalper Sim
 
 on:
-  schedule:
-    # اجرای خودکار شنبه تا چهارشنبه ساعت 05:15 UTC (08:45 صبح ایران)
-    - cron: '15 5 * * 0,1,2,3,6'
   workflow_dispatch:
   push:
     branches: [ main ]
